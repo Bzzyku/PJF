@@ -4,11 +4,53 @@ from dotenv import load_dotenv
 from typing import Optional
 load_dotenv()
 from enum import Enum
+from neo4j import GraphDatabase
+class CreateUser:
+
+    def __init__(self, uri, user, password):
+        self.driver = GraphDatabase.driver(uri, auth=(user, password))
+
+    def close(self):
+        self.driver.close()
+
+    def create_user(self, name, surname, weight, height, gender, age):
+        with self.driver.session() as session:
+            user = session.write_transaction(self._create_and_return_user, name, surname, weight, height, gender, age)
+            print(user)
+
+    @staticmethod
+    def _create_and_return_user(tx, name, surname, weight, height, gender, age):
+        result = tx.run("CREATE (a:User) "
+                        "SET a.name = $name "
+                        "SET a.surname = $surname "
+                        "SET a.weight = $weight "
+                        "SET a.height = $height "
+                        "SET a.gender = $gender "
+                        "SET a.age = $age "
+                        "RETURN a",
+                        name=name, surname=surname, weight=weight, height=height, gender=gender, age=age)
+        return result.single()[0]
+
+    def create_exercise(self, exercise, reps, weight, series, data):
+        with self.driver.session() as session:
+            exercise = session.write_transaction(self._create_and_save_exercise, exercise, reps, weight, series, data=data)
+
+    @staticmethod
+    def _create_and_save_exercise(tx, exercise, reps, weight, series, data):
+        result = tx.run("CREATE (a:Exercise) "
+                        "SET a.exercise = $exercise "
+                        "SET a.reps = $reps "
+                        "SET a.weight = $weight "
+                        "SET a.series = $series "
+                        "SET a.data = $data "
+                        "RETURN a",
+                        exercise=exercise, reps=reps, weight=weight, series=series, data=data)
+        return result.single()[0]
 
 class Type_Goal(Enum):
-	maintain = "maintain"
-	lose = "lose"
-	gain = "gain"
+    maintain = "maintain"
+    lose = "lose"
+    gain = "gain"
 
 class Type_Sex(Enum):
 	male = "male"
@@ -167,10 +209,10 @@ class gym_calculator:
 	def bmr(self, weight: float, height: float, age: int, sex: str):
 		url = "https://gym-calculations.p.rapidapi.com/bmr"
 		payload = {
-			"weight": 70,
-			"height": 1.8,
-			"age": 30,
-			"gender": "male"
+			"weight": weight,
+			"height": height,
+			"age": age,
+			"gender": sex
 		}
 		response = requests.post(url, json=payload, headers=self.headers)
 		result = response.json()
